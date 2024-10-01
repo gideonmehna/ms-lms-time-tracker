@@ -77,7 +77,7 @@ table th, table td {
 
 table th {
     background-color: var(--primary-color);
-    color: white;
+    color: white!important;
 }
 
 table tr:hover {

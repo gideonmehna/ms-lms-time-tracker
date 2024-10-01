@@ -23,6 +23,12 @@ function sendTimeData(start, end) {
             end_time: end.toISOString(),
             session_date: sessionDate,
         },
+        success: function(response) {
+            console.log('AJAX success:', response);
+        },
+        error: function(xhr, status, error) {
+            console.error('AJAX error:', status, error);
+        }
     });
 }
 

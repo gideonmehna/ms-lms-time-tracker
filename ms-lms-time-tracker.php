@@ -80,7 +80,20 @@ function mstimer_create_tables() {
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql);
 }
+register_activation_hook(__FILE__, 'mstimer_create_tables');
 
+add_action('admin_head', 'remove_admin_notices_for_plugin_page');
+
+function remove_admin_notices_for_plugin_page() {
+    // Check if the current page is one of your plugin's pages
+    $current_screen = get_current_screen();
+    
+    if (strpos($current_screen->id, 'your_plugin_page_slug') !== false) {
+        // Remove all admin notices
+        remove_all_actions('admin_notices');
+        remove_all_actions('all_admin_notices');
+    }
+}
 
 /**
  * Add admin menu and pages
@@ -107,6 +120,27 @@ function mstimer_admin_page() {
 }
 
 /**
+ * Query functions for reusable logic
+ */
+
+// Fetch average time for courses within date range
+function mstimer_get_course_data($start_date, $end_date) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mstimer_study_sessions';
+
+    try {
+        return $wpdb->get_results($wpdb->prepare("
+            SELECT course_id, AVG(TIMESTAMPDIFF(SECOND, start_time, end_time)) as avg_time 
+            FROM $table_name 
+            WHERE start_time BETWEEN %s AND %s
+            GROUP BY course_id
+        ", $start_date, $end_date . ' 23:59:59'));
+    } catch (Exception $e) {
+        mstimer_log_error("Error fetching course data: " . $e->getMessage());
+        return [];
+    }
+}
+/**
  * Display courses page content
  */
 function mstimer_courses_page() {
@@ -122,6 +156,9 @@ function mstimer_courses_page() {
     echo '</form>';
 
     $courses_data = mstimer_get_course_data($start_date, $end_date);
+    echo '<pre>';
+    var_dump($courses_data);
+    echo '</pre>';
 
     // After the filter form
     $export_url = add_query_arg([
@@ -462,7 +499,7 @@ function mstimer_students_page() {
 /**
  * Export time tracking data to CSV
  */
-function mstime_Export_csv() {
+function mstimer_export_csv() {
     if (!isset($_GET['export_csv'])) {
         return;
     }
@@ -538,14 +575,8 @@ function mstimer_save_student_time() {
     if (isset($_POST['user_id'], $_POST['course_id'], $_POST['lesson_id'], $_POST['start_time'], $_POST['end_time'])) {
         global $wpdb;
 
-        $user_id = intval($_POST['user_id']);
-        $course_id = intval($_POST['course_id']);
-        $lesson_id = intval($_POST['lesson_id']);
-        // $time_spent = floatval($_POST['time_spent']);
-
-        // Save time in the course table
         $table_name = $wpdb->prefix . 'mstimer_study_sessions';
-        $wpdb->insert($table_name, array(
+        $result = $wpdb->insert($table_name, array(
             'user_id' => intval($_POST['user_id']),
             'course_id' => intval($_POST['course_id']),
             'lesson_id' => intval($_POST['lesson_id']),
@@ -554,9 +585,11 @@ function mstimer_save_student_time() {
             'session_date' => sanitize_text_field($_POST['session_date']),
         ));
 
-        
-        wp_send_json_success();
-
+        if ($result === false) {
+            wp_send_json_error('Failed to insert data: ' . $wpdb->last_error);
+        } else {
+            wp_send_json_success('Data inserted successfully');
+        }
     } else {
         wp_send_json_error('Invalid parameters.');
     }
