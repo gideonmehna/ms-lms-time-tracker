@@ -229,6 +229,7 @@ function mstimer_courses_page() {
 
 /**
  * Display students page content
+ * 
  */
 function mstimer_students_page() {
     global $wpdb;
@@ -327,7 +328,7 @@ function mstimer_save_student_time() {
 
         
         wp_send_json_success();
-        
+
     } else {
         wp_send_json_error('Invalid parameters.');
     }
