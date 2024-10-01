@@ -13,7 +13,7 @@ function stopTimer() {
     clearInterval(interval);
 }
 
-// Start timer when the page is focused
+// Start timer when the page is focused --
 window.addEventListener('focus', function() {
     startTimer();
 });
