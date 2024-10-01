@@ -327,6 +327,7 @@ function mstimer_save_student_time() {
 
         
         wp_send_json_success();
+        
     } else {
         wp_send_json_error('Invalid parameters.');
     }
