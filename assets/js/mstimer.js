@@ -10,6 +10,7 @@ function stopTimer() {
 }
 
 function sendTimeData(start, end) {
+    let sessionDate = start.toISOString().split('T')[0];
     jQuery.ajax({
         type: 'POST',
         url: mstimer_vars.ajax_url,
@@ -20,6 +21,7 @@ function sendTimeData(start, end) {
             lesson_id: mstimer_vars.lesson_id,
             start_time: start.toISOString(),
             end_time: end.toISOString(),
+            session_date: sessionDate,
         },
     });
 }

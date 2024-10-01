@@ -322,6 +322,7 @@ function mstimer_save_student_time() {
             'lesson_id' => intval($_POST['lesson_id']),
             'start_time' => sanitize_text_field($_POST['start_time']),
             'end_time' => sanitize_text_field($_POST['end_time']),
+            'session_date' => sanitize_text_field($_POST['session_date']),
         ));
 
         
