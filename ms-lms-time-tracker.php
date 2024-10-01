@@ -30,6 +30,23 @@ function mstimer_enqueue_scripts() {
 }
 add_action('wp_enqueue_scripts', 'mstimer_enqueue_scripts');
 
+
+function mstimer_enqueue_admin_styles($hook) {
+    if (strpos($hook, 'mstimer') !== false) {
+        wp_enqueue_style('mstimer-admin-css', plugins_url('/assets/css/mstimer-admin.css', __FILE__));
+    }
+}
+add_action('admin_enqueue_scripts', 'mstimer_enqueue_admin_styles');
+
+
+/**
+ * Helper function to log errors
+ */
+function mstimer_log_error($message) {
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log($message);
+    }
+}
 /**
  * Add admin menu and pages
  */
@@ -71,8 +88,14 @@ function mstimer_create_tables() {
 function mstimer_add_admin_menu() {
     add_menu_page('Time Tracking', 'Time Tracking', 'manage_options', 'mstimer_admin', 'mstimer_admin_page');
     add_submenu_page('mstimer_admin', 'Courses', 'Courses', 'manage_options', 'mstimer_courses', 'mstimer_courses_page');
+    add_submenu_page(null, 'Course Detail', 'Course Detail', 'manage_options', 'mstimer_course_detail', 'mstimer_course_detail_page');
+    add_submenu_page(null, 'Lesson Detail', 'Lesson Detail', 'manage_options', 'mstimer_lesson_detail', 'mstimer_lesson_detail_page');
+    add_submenu_page(null, 'Student Detail', 'Student Detail', 'manage_options', 'mstimer_student_detail', 'mstimer_student_detail_page');
     add_submenu_page('mstimer_admin', 'Students', 'Students', 'manage_options', 'mstimer_students', 'mstimer_students_page');
 }
+
+
+
 add_action('admin_menu', 'mstimer_add_admin_menu');
 
 /**
@@ -87,10 +110,6 @@ function mstimer_admin_page() {
  * Display courses page content
  */
 function mstimer_courses_page() {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'mstimer_study_sessions';
-
-    // Date range filter
     $start_date = isset($_GET['start_date']) ? sanitize_text_field($_GET['start_date']) : date('Y-m-d', strtotime('-30 days'));
     $end_date = isset($_GET['end_date']) ? sanitize_text_field($_GET['end_date']) : date('Y-m-d');
 
@@ -99,133 +118,299 @@ function mstimer_courses_page() {
     echo '<input type="hidden" name="page" value="mstimer_courses">';
     echo 'Start Date: <input type="date" name="start_date" value="' . esc_attr($start_date) . '">';
     echo 'End Date: <input type="date" name="end_date" value="' . esc_attr($end_date) . '">';
-    echo '<input type="submit" value="Filter">';
+    echo '<input type="submit" value="Filter" class="button">';
     echo '</form>';
 
-    // Get course data
-    $courses_data = $wpdb->get_results($wpdb->prepare("
-        SELECT course_id, AVG(TIMESTAMPDIFF(SECOND, start_time, end_time)) as avg_time 
-        FROM $table_name 
-        WHERE start_time BETWEEN %s AND %s
-        GROUP BY course_id
-    ", $start_date, $end_date . ' 23:59:59'));
+    $courses_data = mstimer_get_course_data($start_date, $end_date);
 
-    echo '<table>';
-    echo '<tr><th>Course</th><th>Average Time (seconds)</th></tr>';
+    // After the filter form
+    $export_url = add_query_arg([
+        'export_csv' => '1',
+        'page_type' => 'courses',
+        'start_date' => $start_date,
+        'end_date' => $end_date,
+    ]);
+
+    echo '<a href="' . esc_url($export_url) . '" class="button">Export CSV</a>';
+
+
+    echo '<table class="wp-list-table widefat fixed striped">';
+    echo '<thead><tr><th>Course</th><th>Average Time (seconds)</th></tr></thead><tbody>';
 
     foreach ($courses_data as $data) {
         $course_title = get_the_title($data->course_id);
+        $course_link = admin_url('admin.php?page=mstimer_course_detail&course_id=' . $data->course_id . '&start_date=' . $start_date . '&end_date=' . $end_date);
         echo '<tr>';
-        echo '<td><a href="?page=mstimer_courses&course_id=' . $data->course_id . '&start_date=' . $start_date . '&end_date=' . $end_date . '">' . esc_html($course_title) . '</a></td>';
-        echo '<td>' . esc_html($data->avg_time) . '</td>';
+        echo '<td><a href="' . esc_url($course_link) . '">' . esc_html($course_title) . '</a></td>';
+        echo '<td>' . esc_html(round($data->avg_time, 2)) . '</td>';
         echo '</tr>';
     }
+    echo '</tbody></table>';
+}
 
-    echo '</table>';
 
-    if (isset($_GET['course_id'])) {
-        $course_id = intval($_GET['course_id']);
-        $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'lessons';
+function mstimer_course_detail_page() {
+    $course_id = isset($_GET['course_id']) ? intval($_GET['course_id']) : 0;
+    $start_date = isset($_GET['start_date']) ? sanitize_text_field($_GET['start_date']) : date('Y-m-d', strtotime('-30 days'));
+    $end_date = isset($_GET['end_date']) ? sanitize_text_field($_GET['end_date']) : date('Y-m-d');
 
-        echo '<h2>' . esc_html(get_the_title($course_id)) . '</h2>';
-        echo '<h2 class="nav-tab-wrapper">';
-        echo '<a href="?page=mstimer_courses&course_id=' . $course_id . '&tab=lessons&start_date=' . $start_date . '&end_date=' . $end_date . '" class="nav-tab ' . ($active_tab == 'lessons' ? 'nav-tab-active' : '') . '">Lessons</a>';
-        echo '<a href="?page=mstimer_courses&course_id=' . $course_id . '&tab=students&start_date=' . $start_date . '&end_date=' . $end_date . '" class="nav-tab ' . ($active_tab == 'students' ? 'nav-tab-active' : '') . '">Students</a>';
-        echo '</h2>';
-
-        if ($active_tab == 'lessons') {
-            $lessons_data = $wpdb->get_results($wpdb->prepare("
-                SELECT lesson_id, AVG(TIMESTAMPDIFF(SECOND, start_time, end_time)) as avg_time 
-                FROM $table_name 
-                WHERE course_id = %d AND start_time BETWEEN %s AND %s
-                GROUP BY lesson_id
-            ", $course_id, $start_date, $end_date . ' 23:59:59'));
-
-            echo '<table>';
-            echo '<tr><th>Lesson</th><th>Average Time (seconds)</th></tr>';
-
-            foreach ($lessons_data as $data) {
-                $lesson_title = get_the_title($data->lesson_id);
-                echo '<tr>';
-                echo '<td><a href="?page=mstimer_courses&course_id=' . $course_id . '&lesson_id=' . $data->lesson_id . '&start_date=' . $start_date . '&end_date=' . $end_date . '">' . esc_html($lesson_title) . '</a></td>';
-                echo '<td>' . esc_html($data->avg_time) . '</td>';
-                echo '</tr>';
-            }
-
-            echo '</table>';
-        } elseif ($active_tab == 'students') {
-            $students_data = $wpdb->get_results($wpdb->prepare("
-                SELECT user_id, SUM(TIMESTAMPDIFF(SECOND, start_time, end_time)) as total_time 
-                FROM $table_name 
-                WHERE course_id = %d AND start_time BETWEEN %s AND %s
-                GROUP BY user_id
-            ", $course_id, $start_date, $end_date . ' 23:59:59'));
-
-            echo '<table>';
-            echo '<tr><th>Student</th><th>Total Time (seconds)</th></tr>';
-
-            foreach ($students_data as $data) {
-                $user = get_userdata($data->user_id);
-                echo '<tr>';
-                echo '<td><a href="?page=mstimer_courses&course_id=' . $course_id . '&user_id=' . $data->user_id . '&start_date=' . $start_date . '&end_date=' . $end_date . '">' . esc_html($user->display_name) . '</a></td>';
-                echo '<td>' . esc_html($data->total_time) . '</td>';
-                echo '</tr>';
-            }
-
-            echo '</table>';
-        }
+    if ($course_id == 0) {
+        echo '<p>Invalid course.</p>';
+        return;
     }
 
-    if (isset($_GET['lesson_id'])) {
-        $lesson_id = intval($_GET['lesson_id']);
+    $course_title = get_the_title($course_id);
+    echo '<h1>Course: ' . esc_html($course_title) . '</h1>';
+
+    // Tabs for Lesson View and Student View
+    $current_tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'lesson_view';
+
+    echo '<h2 class="nav-tab-wrapper">';
+    echo '<a href="' . esc_url(add_query_arg(['tab' => 'lesson_view'])) . '" class="nav-tab ' . ($current_tab == 'lesson_view' ? 'nav-tab-active' : '') . '">Lesson View</a>';
+    echo '<a href="' . esc_url(add_query_arg(['tab' => 'student_view'])) . '" class="nav-tab ' . ($current_tab == 'student_view' ? 'nav-tab-active' : '') . '">Student View</a>';
+    echo '</h2>';
+
+    // Date range filter
+    echo '<form method="get">';
+    echo '<input type="hidden" name="page" value="mstimer_course_detail">';
+    echo '<input type="hidden" name="course_id" value="' . esc_attr($course_id) . '">';
+    echo '<input type="hidden" name="tab" value="' . esc_attr($current_tab) . '">';
+    echo 'Start Date: <input type="date" name="start_date" value="' . esc_attr($start_date) . '">';
+    echo 'End Date: <input type="date" name="end_date" value="' . esc_attr($end_date) . '">';
+    echo '<input type="submit" value="Filter" class="button">';
+    echo '</form>';
+
+    $export_url = add_query_arg([
+        'export_csv' => '1',
+        'page_type' => 'students',
+        'course_id'  => $course_id, // The ID of the course the student is enrolled in
+        'start_date' => $start_date,
+        'end_date'   => $end_date,
+    ]);
+    echo '<a href="' . esc_url($export_url) . '" class="button">Export CSV</a>';
+    
+
+    if ($current_tab == 'lesson_view') {
+        mstimer_lesson_view($course_id, $start_date, $end_date);
+    } else {
+        mstimer_student_view($course_id, $start_date, $end_date);
+    }
+}
+
+function mstimer_get_lessons_data($course_id, $start_date, $end_date) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mstimer_study_sessions';
+
+    try {
+        return $wpdb->get_results($wpdb->prepare("
+            SELECT lesson_id, AVG(TIMESTAMPDIFF(SECOND, start_time, end_time)) as avg_time
+            FROM $table_name
+            WHERE course_id = %d AND start_time BETWEEN %s AND %s
+            GROUP BY lesson_id
+        ", $course_id, $start_date, $end_date . ' 23:59:59'));
+    } catch (Exception $e) {
+        mstimer_log_error("Error fetching lesson data: " . $e->getMessage());
+        return [];
+    }
+}
+
+
+function mstimer_lesson_view($course_id, $start_date, $end_date) {
+    global $wpdb;
+
+    $lessons_data = mstimer_get_lessons_data($course_id, $start_date, $end_date);
+
+    echo '<h2>Lesson View</h2>';
+    echo '<table class="wp-list-table widefat fixed striped">';
+    echo '<thead><tr><th>Lesson</th><th>Average Time (seconds)</th></tr></thead><tbody>';
+
+    foreach ($lessons_data as $data) {
+        $lesson_title = get_the_title($data->lesson_id);
+        $lesson_link = admin_url('admin.php?page=mstimer_lesson_detail&lesson_id=' . $data->lesson_id . '&course_id=' . $course_id . '&start_date=' . $start_date . '&end_date=' . $end_date);
+        echo '<tr>';
+        echo '<td><a href="' . esc_url($lesson_link) . '">' . esc_html($lesson_title) . '</a></td>';
+        echo '<td>' . esc_html(round($data->avg_time, 2)) . '</td>';
+        echo '</tr>';
+    }
+    echo '</tbody></table>';
+}
+
+function mstimer_lesson_student_times($lesson_id, $start_date, $end_date) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mstimer_study_sessions';
+
+    try {
         $students_data = $wpdb->get_results($wpdb->prepare("
-            SELECT user_id, SUM(TIMESTAMPDIFF(SECOND, start_time, end_time)) as total_time 
-            FROM $table_name 
+            SELECT user_id, SUM(TIMESTAMPDIFF(SECOND, start_time, end_time)) as total_time
+            FROM $table_name
             WHERE lesson_id = %d AND start_time BETWEEN %s AND %s
             GROUP BY user_id
         ", $lesson_id, $start_date, $end_date . ' 23:59:59'));
-
-        echo '<h3>Students for ' . esc_html(get_the_title($lesson_id)) . '</h3>';
-        echo '<table>';
-        echo '<tr><th>Student</th><th>Total Time (seconds)</th></tr>';
-
-        foreach ($students_data as $data) {
-            $user = get_userdata($data->user_id);
-            echo '<tr>';
-            echo '<td>' . esc_html($user->display_name) . '</td>';
-            echo '<td>' . esc_html($data->total_time) . '</td>';
-            echo '</tr>';
-        }
-
-        echo '</table>';
+    } catch (Exception $e) {
+        mstimer_log_error("Error fetching student times for lesson: " . $e->getMessage());
+        return;
     }
 
-    if (isset($_GET['user_id'])) {
-        $user_id = intval($_GET['user_id']);
-        $course_id = intval($_GET['course_id']);
+    echo '<h2>Student Times for Lesson</h2>';
+    echo '<table class="wp-list-table widefat fixed striped">';
+    echo '<thead><tr><th>Student</th><th>Total Time (seconds)</th></tr></thead><tbody>';
+
+    foreach ($students_data as $data) {
+        $user_info = get_userdata($data->user_id);
+        $student_name = $user_info ? $user_info->display_name : 'Unknown User';
+        echo '<tr>';
+        echo '<td>' . esc_html($student_name) . '</td>';
+        echo '<td>' . esc_html(round($data->total_time, 2)) . '</td>';
+        echo '</tr>';
+    }
+    echo '</tbody></table>';
+}
+
+function mstimer_lesson_detail_page() {
+    $lesson_id = isset($_GET['lesson_id']) ? intval($_GET['lesson_id']) : 0;
+    $course_id = isset($_GET['course_id']) ? intval($_GET['course_id']) : 0;
+    $start_date = isset($_GET['start_date']) ? sanitize_text_field($_GET['start_date']) : date('Y-m-d', strtotime('-30 days'));
+    $end_date = isset($_GET['end_date']) ? sanitize_text_field($_GET['end_date']) : date('Y-m-d');
+
+    if ($lesson_id == 0 || $course_id == 0) {
+        echo '<p>Invalid lesson or course.</p>';
+        return;
+    }
+
+    $lesson_title = get_the_title($lesson_id);
+    echo '<h1>Lesson: ' . esc_html($lesson_title) . '</h1>';
+
+    // Date range filter
+    echo '<form method="get">';
+    echo '<input type="hidden" name="page" value="mstimer_lesson_detail">';
+    echo '<input type="hidden" name="lesson_id" value="' . esc_attr($lesson_id) . '">';
+    echo '<input type="hidden" name="course_id" value="' . esc_attr($course_id) . '">';
+    echo 'Start Date: <input type="date" name="start_date" value="' . esc_attr($start_date) . '">';
+    echo 'End Date: <input type="date" name="end_date" value="' . esc_attr($end_date) . '">';
+    echo '<input type="submit" value="Filter" class="button">';
+    echo '</form>';
+
+    $export_url = add_query_arg([
+        'export_csv' => '1',
+        'page_type'  => 'lessons',
+        'course_id'  => $course_id,  // The course that contains the lesson
+        'lesson_id'  => $lesson_id,  // The specific lesson being exported
+        'start_date' => $start_date,
+        'end_date'   => $end_date,
+    ]);
+    echo '<a href="' . esc_url($export_url) . '" class="button">Export CSV</a>';
+    
+
+    mstimer_lesson_student_times($lesson_id, $start_date, $end_date);
+}
+
+function mstimer_get_students_data($course_id, $start_date, $end_date) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mstimer_study_sessions';
+
+    try {
+        return $wpdb->get_results($wpdb->prepare("
+            SELECT user_id, SUM(TIMESTAMPDIFF(SECOND, start_time, end_time)) as total_time
+            FROM $table_name
+            WHERE course_id = %d AND start_time BETWEEN %s AND %s
+            GROUP BY user_id
+        ", $course_id, $start_date, $end_date . ' 23:59:59'));
+    } catch (Exception $e) {
+        mstimer_log_error("Error fetching student data: " . $e->getMessage());
+        return [];
+    }
+}
+
+function mstimer_student_view($course_id, $start_date, $end_date) {
+    global $wpdb;
+
+    $students_data = mstimer_get_students_data($course_id, $start_date, $end_date);
+
+    echo '<h2>Student View</h2>';
+    echo '<table class="wp-list-table widefat fixed striped">';
+    echo '<thead><tr><th>Student</th><th>Total Time (seconds)</th></tr></thead><tbody>';
+
+    foreach ($students_data as $data) {
+        $user_info = get_userdata($data->user_id);
+        $student_name = $user_info ? $user_info->display_name : 'Unknown User';
+        $student_link = admin_url('admin.php?page=mstimer_student_detail&user_id=' . $data->user_id . '&course_id=' . $course_id . '&start_date=' . $start_date . '&end_date=' . $end_date);
+        echo '<tr>';
+        echo '<td><a href="' . esc_url($student_link) . '">' . esc_html($student_name) . '</a></td>';
+        echo '<td>' . esc_html(round($data->total_time, 2)) . '</td>';
+        echo '</tr>';
+    }
+    echo '</tbody></table>';
+}
+
+function mstimer_student_lesson_times($user_id, $course_id, $start_date, $end_date) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mstimer_study_sessions';
+
+    try {
         $lessons_data = $wpdb->get_results($wpdb->prepare("
-            SELECT lesson_id, SUM(TIMESTAMPDIFF(SECOND, start_time, end_time)) as total_time 
-            FROM $table_name 
+            SELECT lesson_id, SUM(TIMESTAMPDIFF(SECOND, start_time, end_time)) as total_time
+            FROM $table_name
             WHERE user_id = %d AND course_id = %d AND start_time BETWEEN %s AND %s
             GROUP BY lesson_id
         ", $user_id, $course_id, $start_date, $end_date . ' 23:59:59'));
-
-        $user = get_userdata($user_id);
-        echo '<h3>Lessons for ' . esc_html($user->display_name) . '</h3>';
-        echo '<table>';
-        echo '<tr><th>Lesson</th><th>Total Time (seconds)</th></tr>';
-
-        foreach ($lessons_data as $data) {
-            $lesson_title = get_the_title($data->lesson_id);
-            echo '<tr>';
-            echo '<td>' . esc_html($lesson_title) . '</td>';
-            echo '<td>' . esc_html($data->total_time) . '</td>';
-            echo '</tr>';
-        }
-
-        echo '</table>';
+    } catch (Exception $e) {
+        mstimer_log_error("Error fetching lessons for student: " . $e->getMessage());
+        return;
     }
+
+    echo '<h2>Lessons Times for Student</h2>';
+    echo '<table class="wp-list-table widefat fixed striped">';
+    echo '<thead><tr><th>Lesson</th><th>Total Time (seconds)</th></tr></thead><tbody>';
+
+    foreach ($lessons_data as $data) {
+        $lesson_title = get_the_title($data->lesson_id);
+        echo '<tr>';
+        echo '<td>' . esc_html($lesson_title) . '</td>';
+        echo '<td>' . esc_html(round($data->total_time, 2)) . '</td>';
+        echo '</tr>';
+    }
+    echo '</tbody></table>';
 }
+
+function mstimer_student_detail_page() {
+    $user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
+    $course_id = isset($_GET['course_id']) ? intval($_GET['course_id']) : 0;
+    $start_date = isset($_GET['start_date']) ? sanitize_text_field($_GET['start_date']) : date('Y-m-d', strtotime('-30 days'));
+    $end_date = isset($_GET['end_date']) ? sanitize_text_field($_GET['end_date']) : date('Y-m-d');
+
+    if ($user_id == 0 || $course_id == 0) {
+        echo '<p>Invalid student or course.</p>';
+        return;
+    }
+
+    $user_info = get_userdata($user_id);
+    $student_name = $user_info ? $user_info->display_name : 'Unknown User';
+    echo '<h1>Student: ' . esc_html($student_name) . '</h1>';
+
+    // Date range filter
+    echo '<form method="get">';
+    echo '<input type="hidden" name="page" value="mstimer_student_detail">';
+    echo '<input type="hidden" name="user_id" value="' . esc_attr($user_id) . '">';
+    echo '<input type="hidden" name="course_id" value="' . esc_attr($course_id) . '">';
+    echo 'Start Date: <input type="date" name="start_date" value="' . esc_attr($start_date) . '">';
+    echo 'End Date: <input type="date" name="end_date" value="' . esc_attr($end_date) . '">';
+    echo '<input type="submit" value="Filter" class="button">';
+    echo '</form>';
+
+    $export_url = add_query_arg([
+        'export_csv' => '1',
+        'page_type' => 'courses',
+        'course_id'  => $course_id,
+        'user_id'   => $user_id,    // Filter by a specific student/user
+        'start_date' => $start_date,
+        'end_date'   => $end_date,
+    ]);
+    echo '<a href="' . esc_url($export_url) . '" class="button">Export CSV</a>';
+    
+
+    mstimer_student_lesson_times($user_id, $course_id, $start_date, $end_date);
+}
+
 
 /**
  * Display students page content
@@ -277,30 +462,73 @@ function mstimer_students_page() {
 /**
  * Export time tracking data to CSV
  */
-function mstimer_export_csv() {
-    if (isset($_GET['export_csv'])) {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'mstimer_time_logs';
-
-        $filename = 'course_time_logs_' . date('Y-m-d') . '.csv';
-        header('Content-Type: text/csv');
-        header('Content-Disposition: attachment;filename=' . $filename);
-
-        $students_data = $wpdb->get_results("SELECT user_id, course_id, SUM(time_spent) as total_time FROM $table_name GROUP BY user_id, course_id");
-
-        $output = fopen('php://output', 'w');
-        fputcsv($output, array('Student', 'Course', 'Total Time (seconds)'));
-
-        foreach ($students_data as $data) {
-            $user = get_userdata($data->user_id);
-            $course_title = get_the_title($data->course_id);
-            fputcsv($output, array($user->display_name, $course_title, $data->total_time));
-        }
-
-        fclose($output);
-        exit;
+function mstime_Export_csv() {
+    if (!isset($_GET['export_csv'])) {
+        return;
     }
+
+    $page_type = isset($_GET['page_type']) ? sanitize_text_field($_GET['page_type']) : '';
+    $start_date = isset($_GET['start_date']) ? sanitize_text_field($_GET['start_date']) : '';
+    $end_date = isset($_GET['end_date']) ? sanitize_text_field($_GET['end_date']) : '';
+    $course_id = isset($_GET['course_id']) ? intval($_GET['course_id']) : 0;
+    $lesson_id = isset($_GET['lesson_id']) ? intval($_GET['lesson_id']) : 0;
+    $user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
+
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="export.csv"');
+
+    $output = fopen('php://output', 'w');
+
+    if ($page_type == 'courses') {
+        $data = mstimer_get_course_data($start_date, $end_date);
+        fputcsv($output, array('Course ID', 'Average Time (seconds)'));
+        foreach ($data as $row) {
+            fputcsv($output, array($row->course_id, round($row->avg_time, 2)));
+        }
+    } elseif ($page_type == 'lessons' && $course_id) {
+        $data = mstimer_get_lessons_data($course_id, $start_date, $end_date);
+        fputcsv($output, array('Lesson ID', 'Average Time (seconds)'));
+        foreach ($data as $row) {
+            fputcsv($output, array($row->lesson_id, round($row->avg_time, 2)));
+        }
+    } elseif ($page_type == 'lesson_detail' && $lesson_id) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'mstimer_study_sessions';
+        $students_data = $wpdb->get_results($wpdb->prepare("
+            SELECT user_id, SUM(TIMESTAMPDIFF(SECOND, start_time, end_time)) as total_time
+            FROM $table_name
+            WHERE lesson_id = %d AND start_time BETWEEN %s AND %s
+            GROUP BY user_id
+        ", $lesson_id, $start_date, $end_date . ' 23:59:59'));
+        fputcsv($output, array('User ID', 'Total Time (seconds)'));
+        foreach ($students_data as $row) {
+            fputcsv($output, array($row->user_id, round($row->total_time, 2)));
+        }
+    } elseif ($page_type == 'students' && $course_id) {
+        $data = mstimer_get_students_data($course_id, $start_date, $end_date);
+        fputcsv($output, array('User ID', 'Total Time (seconds)'));
+        foreach ($data as $row) {
+            fputcsv($output, array($row->user_id, round($row->total_time, 2)));
+        }
+    } elseif ($page_type == 'student_detail' && $user_id && $course_id) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'mstimer_study_sessions';
+        $lessons_data = $wpdb->get_results($wpdb->prepare("
+            SELECT lesson_id, SUM(TIMESTAMPDIFF(SECOND, start_time, end_time)) as total_time
+            FROM $table_name
+            WHERE user_id = %d AND course_id = %d AND start_time BETWEEN %s AND %s
+            GROUP BY lesson_id
+        ", $user_id, $course_id, $start_date, $end_date . ' 23:59:59'));
+        fputcsv($output, array('Lesson ID', 'Total Time (seconds)'));
+        foreach ($lessons_data as $row) {
+            fputcsv($output, array($row->lesson_id, round($row->total_time, 2)));
+        }
+    }
+
+    fclose($output);
+    exit;
 }
+
 add_action('admin_init', 'mstimer_export_csv');
 
 /**

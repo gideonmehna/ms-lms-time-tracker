@@ -1,0 +1,112 @@
+:root {
+    /* Color Variables */
+    --primary-color: #002f6c;       /* Navy Blue */
+    --secondary-color: #4da6ff;     /* Light Blue */
+    --hover-color: #5c3c92;         /* Nice Purple */
+    --text-color: #333;             /* General Text Color */
+    --bg-color: #f7f9fc;            /* Light Background Color */
+    --border-color: #d3d3d3;        /* Border Color */
+    --shadow-color: rgba(0, 0, 0, 0.1); /* Soft Shadow */
+    
+    /* Spacing Variables */
+    --padding: 12px;
+    --margin: 16px;
+    --border-radius: 8px;
+    
+    /* Font Variables */
+    --font-heading: 'Arial', sans-serif;
+    --font-text: 'Helvetica', sans-serif;
+}
+
+/* Global Styling */
+body {
+    font-family: var(--font-text);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: var(--primary-color);
+    text-shadow: 1px 1px var(--shadow-color);
+    margin-bottom: var(--margin);
+}
+
+/* Links */
+a {
+    color: var(--secondary-color);
+    text-decoration: none;
+    transition: color 0.3s ease, box-shadow 0.3s ease;
+}
+
+a:hover {
+    color: var(--hover-color);
+    box-shadow: 0 2px 6px var(--shadow-color);
+}
+
+/* Button Links */
+a.button {
+    display: inline-block;
+    padding: var(--padding);
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 8px var(--shadow-color);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+a.button:hover {
+    background-color: var(--hover-color);
+    box-shadow: 0 6px 12px var(--shadow-color);
+}
+
+/* Table */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: var(--margin);
+    box-shadow: 0 4px 8px var(--shadow-color);
+}
+
+table th, table td {
+    padding: var(--padding);
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+table th {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+table tr:hover {
+    background-color: var(--bg-color);
+    box-shadow: 0 4px 8px var(--shadow-color);
+}
+
+/* Buttons */
+button {
+    padding: var(--padding);
+    background-color: var(--secondary-color);
+    border: none;
+    border-radius: var(--border-radius);
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+button:hover {
+    background-color: var(--hover-color);
+    box-shadow: 0 4px 8px var(--shadow-color);
+}
+
+/* Text */
+p, li {
+    line-height: 1.6;
+    margin-bottom: var(--margin);
+}
+
+ul, ol {
+    padding-left: 20px;
+}
