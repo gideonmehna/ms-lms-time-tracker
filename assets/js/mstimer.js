@@ -36,6 +36,7 @@ window.addEventListener('beforeunload', function() {
             action: 'save_student_time',
             user_id: mstimer_vars.user_id,
             course_id: mstimer_vars.course_id,
+            lesson_id: mstimer_vars.lesson_id,  // Add lesson_id to the data
             time_spent: timeSpent,
         },
     });
