@@ -1,34 +1,15 @@
-let startTime = new Date().getTime();
-let totalTime = 0;
-let interval;
+let startTime;
 
-// Track time only when the page is focused
 function startTimer() {
-    interval = setInterval(function() {
-        totalTime += 1000;  // Increment time by 1 second
-    }, 1000);
+    startTime = new Date();
 }
 
 function stopTimer() {
-    clearInterval(interval);
+    let endTime = new Date();
+    sendTimeData(startTime, endTime);
 }
 
-// Start timer when the page is focused --
-window.addEventListener('focus', function() {
-    startTimer();
-});
-
-// Stop timer when the page loses focus
-window.addEventListener('blur', function() {
-    stopTimer();
-});
-
-// Send data to the backend when the page is unloaded
-window.addEventListener('beforeunload', function() {
-    let endTime = new Date().getTime();
-    let timeSpent = totalTime / 1000;  // Convert to seconds
-
-    // Send AJAX request to save time in the backend
+function sendTimeData(start, end) {
     jQuery.ajax({
         type: 'POST',
         url: mstimer_vars.ajax_url,
@@ -36,11 +17,21 @@ window.addEventListener('beforeunload', function() {
             action: 'save_student_time',
             user_id: mstimer_vars.user_id,
             course_id: mstimer_vars.course_id,
-            lesson_id: mstimer_vars.lesson_id,  // Add lesson_id to the data
-            time_spent: timeSpent,
+            lesson_id: mstimer_vars.lesson_id,
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
         },
     });
-});
+}
+
+// Start timer when the page is focused
+window.addEventListener('focus', startTimer);
+
+// Stop timer when the page loses focus
+window.addEventListener('blur', stopTimer);
+
+// Send data to the backend when the page is unloaded
+window.addEventListener('beforeunload', stopTimer);
 
 // Start timer initially
 startTimer();
