@@ -22,10 +22,26 @@ if (!defined('ABSPATH')) {
  */
 function mstimer_enqueue_scripts() {
     wp_enqueue_script('mstimer-js', plugins_url('/assets/js/mstimer.js', __FILE__), array('jquery'), null, true);
+
+    $course_id = 0;
+    $lesson_id = 0;
+
+    // Check if we're on a single course page
+    if (function_exists('STM_LMS_Courses') && is_singular('stm-courses')) {
+        $course_id = get_the_ID();
+    }
+
+    // Check if we're on a lesson page
+    if (function_exists('STM_LMS_Lesson') && is_singular('stm-lessons')) {
+        $lesson_id = get_the_ID();
+        $course_id = get_post_meta($lesson_id, 'course_id', true);
+    }
+
     wp_localize_script('mstimer-js', 'mstimer_vars', array(
         'ajax_url' => admin_url('admin-ajax.php'),
         'user_id' => get_current_user_id(),
-        'course_id' => get_the_ID(),
+        'course_id' => $course_id,
+        'lesson_id' => $lesson_id,
     ));
 }
 add_action('wp_enqueue_scripts', 'mstimer_enqueue_scripts');
@@ -50,10 +66,7 @@ function mstimer_log_error($message) {
 /**
  * Add admin menu and pages
  */
-// function mstimer_add_admin_menu() {
-//     add_menu_page('Time Tracking', 'Time Tracking', 'manage_options', 'mstimer_admin', 'mstimer_admin_page');
-// }
-// add_action('admin_menu', 'mstimer_add_admin_menu');
+
 
 /**
  * Create database tables on plugin activation
@@ -78,22 +91,62 @@ function mstimer_create_tables() {
     ) $charset_collate;";
 
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-    dbDelta($sql);
+    $result = dbDelta($sql);
+    
+    if (empty($result)) {
+        error_log('mstimer_create_tables: dbDelta returned empty result');
+    } else {
+        error_log('mstimer_create_tables: dbDelta result: ' . print_r($result, true));
+    }
+
+    // Check if the table was actually created
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
+    if (!$table_exists) {
+        error_log("mstimer_create_tables: Table $table_name was not created successfully");
+    } else {
+        error_log("mstimer_create_tables: Table $table_name was created successfully");
+    }
 }
 register_activation_hook(__FILE__, 'mstimer_create_tables');
 
-add_action('admin_head', 'remove_admin_notices_for_plugin_page');
+function mstimer_check_table() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mstimer_study_sessions';
+    
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        mstimer_create_tables();
+        error_log("mstimer_check_table: Table $table_name did not exist, attempted to create it");
+    }
+}
+add_action('init', 'mstimer_check_table');
+
+add_action('admin_notices', 'remove_admin_notices_for_plugin_page', 1);
 
 function remove_admin_notices_for_plugin_page() {
     // Check if the current page is one of your plugin's pages
     $current_screen = get_current_screen();
     
-    if (strpos($current_screen->id, 'your_plugin_page_slug') !== false) {
+    $plugin_pages = array(
+        'toplevel_page_mstimer_admin',
+        'mstimer_page_mstimer_courses',
+        'mstimer_page_mstimer_course_detail',
+        'mstimer_page_mstimer_lesson_detail',
+        'mstimer_page_mstimer_student_detail',
+        'mstimer_page_mstimer_students',
+        'mstimer_courses',
+        'mstimer_course_detail',
+        'mstimer_lesson_detail',
+        'mstimer_student_detail',
+        'mstimer_students'
+    );
+
+    if (in_array($current_screen->id, $plugin_pages)) {
         // Remove all admin notices
         remove_all_actions('admin_notices');
         remove_all_actions('all_admin_notices');
     }
 }
+
 
 /**
  * Add admin menu and pages
@@ -572,10 +625,16 @@ add_action('admin_init', 'mstimer_export_csv');
  * Save student time via AJAX
  */
 function mstimer_save_student_time() {
-    if (isset($_POST['user_id'], $_POST['course_id'], $_POST['lesson_id'], $_POST['start_time'], $_POST['end_time'])) {
-        global $wpdb;
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mstimer_study_sessions';
 
-        $table_name = $wpdb->prefix . 'mstimer_study_sessions';
+    // Check if the table exists
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        wp_send_json_error("Table $table_name does not exist");
+        return;
+    }
+
+    if (isset($_POST['user_id'], $_POST['course_id'], $_POST['lesson_id'], $_POST['start_time'], $_POST['end_time'], $_POST['session_date'])) {
         $result = $wpdb->insert($table_name, array(
             'user_id' => intval($_POST['user_id']),
             'course_id' => intval($_POST['course_id']),
@@ -594,4 +653,5 @@ function mstimer_save_student_time() {
         wp_send_json_error('Invalid parameters.');
     }
 }
+
 add_action('wp_ajax_save_student_time', 'mstimer_save_student_time');
