@@ -39,12 +39,16 @@ function mstimer_activate_plugin() {
     mstimer_create_tables();
 }
 
-// Deactivation hook
-register_deactivation_hook(__FILE__, 'mstimer_deactivate_plugin');
 
+/**
+ * Deactivation function for plugin
+ */
 function mstimer_deactivate_plugin() {
-    // Perform any cleanup tasks here
+    // Add a transient to show a notice upon plugin deactivation
+    set_transient('mstimer_deactivation_notice', true, 5);  // Lasts for 5 seconds
 }
+
+register_deactivation_hook(__FILE__, 'mstimer_deactivate_plugin');
 
 // Initialize the plugin
 add_action('plugins_loaded', 'mstimer_init_plugin');

@@ -15,12 +15,3 @@ function remove_lesson_id_from_url($url, $lesson_id) {
 }
 
 
-
-/**
- * Helper function to log errors
- */
-function mstimer_log_error($message) {
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log($message);
-    }
-}

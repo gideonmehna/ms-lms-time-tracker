@@ -45,8 +45,8 @@ function mstimer_admin_page() {
 
 function mstimer_add_back_buttons() {
     // This function adds a "Back" button to navigate between pages
-    echo '<a href="admin.php?page=mstimer-courses" class="button button-primary">Back to Courses View</a>';
-    echo '<a href="admin.php?page=admin" class="button button-secondary">Back to Admin Page</a>';
+    echo '<a href="admin.php?page=mstimer_courses" class="button button-primary">Back to Courses View</a>';
+    echo '<a href="admin.php?page=mstimer_admin" class="button button-secondary">Back to Time Tracking</a>';
 }
 
 /**
@@ -65,9 +65,7 @@ function mstimer_courses_page() {
     echo '</form>';
 
     $courses_data = mstimer_get_course_data($start_date, $end_date);
-    echo '<pre>';
-    var_dump($courses_data);
-    echo '</pre>';
+   
 
     // After the filter form
     $export_url = add_query_arg([
@@ -87,7 +85,7 @@ function mstimer_courses_page() {
         $course_title = get_the_title($data->course_id);
         $course_link = admin_url('admin.php?page=mstimer_course_detail&course_id=' . $data->course_id . '&start_date=' . $start_date . '&end_date=' . $end_date);
         echo '<tr>';
-        echo '<td><a href="' . esc_url($course_link) . '">' . esc_html($course_title) . 'Link' .'</a></td>';
+        echo '<td><a href="' . esc_url($course_link) . '">' . esc_html($course_title) . '</a></td>';
         echo '<td>' . esc_html(format_time_human_readable(round($data->avg_time, 2))) . '</td>';
         echo '</tr>';
     }

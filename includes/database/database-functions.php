@@ -77,3 +77,56 @@ function mstimer_get_course_data($start_date, $end_date) {
         return [];
     }
 }
+
+/**
+ * Clear all data from the mstimer_study_sessions table
+ */
+function mstimer_clear_table() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mstimer_study_sessions';
+
+    // Delete all records from the table
+    $wpdb->query("TRUNCATE TABLE $table_name");
+
+    error_log("mstimer_clear_table: All data from table $table_name has been cleared.");
+}
+
+
+/**
+ * Display the deactivation notice and option to clear database
+ */
+function mstimer_deactivation_notice() {
+    if (get_transient('mstimer_deactivation_notice')) {
+        ?>
+        <div class="notice notice-warning is-dismissible">
+            <p><strong>Notice:</strong> You have deactivated the 'MSTimer' plugin.</p>
+            <p>Would you like to clear all study session data from the database?</p>
+            <form method="post">
+                <input type="hidden" name="mstimer_clear_data_action" value="1">
+                <button type="submit" class="button button-primary">Yes, clear the data</button>
+                <button type="submit" class="button">No, keep the data</button>
+            </form>
+        </div>
+        <?php
+        // Clean up the transient after displaying it
+        delete_transient('mstimer_deactivation_notice');
+    }
+}
+add_action('admin_notices', 'mstimer_deactivation_notice');
+
+/**
+ * Handle the form submission for clearing data upon plugin deactivation
+ */
+function mstimer_handle_clear_data_request() {
+    if (isset($_POST['mstimer_clear_data_action']) && $_POST['mstimer_clear_data_action'] == '1') {
+        mstimer_clear_table();  // Clear the database table
+        add_action('admin_notices', function () {
+            ?>
+            <div class="notice notice-success is-dismissible">
+                <p>All study session data has been successfully cleared from the database.</p>
+            </div>
+            <?php
+        });
+    }
+}
+add_action('admin_init', 'mstimer_handle_clear_data_request');
