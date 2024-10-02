@@ -2,8 +2,8 @@
 
 
 function mstimer_enqueue_admin_styles($hook) {
-    if (strpos($hook, 'mstimer') !== false) {
-        wp_enqueue_style('mstimer-admin-css', plugins_url('/assets/css/mstimer-admin.css', __FILE__));
+    if (strpos($hook, 'mstimer') !== false) { 
+        wp_enqueue_style('mstimer-admin-css', MSTIMER_PLUGIN_URL .  'assets/css/mstimer-admin.css');
     }
 }
 

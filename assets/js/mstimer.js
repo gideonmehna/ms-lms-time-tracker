@@ -14,7 +14,7 @@ function sendTimeData(start, end) {
         console.error('Missing required IDs');
         return;
     } else {
-        console.log(mstimer_vars.user_id, mstimer_vars.course_id, mstimer_vars.lesson_id)
+        console.log(mstimer_vars.user_id, mstimer_vars.course_id, mstimer_vars.lesson_id);
     }
     let sessionDate = start.toISOString().split('T')[0];
     jQuery.ajax({

@@ -6,7 +6,7 @@
  */
 function mstimer_enqueue_scripts() {
     if (!is_page() && !is_single()) {
-        wp_enqueue_script('mstimer-js', plugins_url('/assets/js/mstimer.js', __FILE__), array('jquery'), null, true);
+        wp_enqueue_script('mstimer-js', MSTIMER_PLUGIN_URL . 'assets/js/mstimer.js', array('jquery'), null, true);
 
         $course_id = null;
         $lesson_id = null;
@@ -21,6 +21,8 @@ function mstimer_enqueue_scripts() {
 
         // Get the post ID from the cleaned URL
         $course_id = url_to_postid($clean_url);
+
+        
     
     
         wp_localize_script('mstimer-js', 'mstimer_vars', array(
@@ -29,7 +31,7 @@ function mstimer_enqueue_scripts() {
             'course_id' => $course_id,
             'lesson_id' => $lesson_id,
         ));
-    }     
+    } 
 }
 
 
