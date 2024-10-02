@@ -17,33 +17,124 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+function get_courses_for_item($item_id) {
+    global $wpdb;
+    
+    // Get the curriculum items table name
+    $curriculum_table = $wpdb->prefix . 'stm_lms_curriculum_items';
+    
+    // Query to find course IDs that contain this item
+    $query = $wpdb->prepare(
+        "SELECT DISTINCT section_id 
+        FROM {$curriculum_table} 
+        WHERE item_id = %d",
+        $item_id
+    );
+    
+    $course_ids = $wpdb->get_col($query);
+    
+    return $course_ids;
+} 
+// Function to get the current URL
+function get_current_url() {
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+    $url = $protocol . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    return $url;
+}
+
+// Function to remove the lesson ID from the URL
+function remove_lesson_id_from_url($url, $lesson_id) {
+    return str_replace($lesson_id, '', $url);
+}
 /**
  * Enqueue scripts for frontend (time tracking)
  */
 function mstimer_enqueue_scripts() {
     wp_enqueue_script('mstimer-js', plugins_url('/assets/js/mstimer.js', __FILE__), array('jquery'), null, true);
 
-    $course_id = 0;
-    $lesson_id = 0;
+    $course_id = null;
+    $lesson_id = null;
 
     // Check if we're on a single course page
-    if (function_exists('STM_LMS_Courses') && is_singular('stm-courses')) {
+    if( 'stm-courses' == get_post_type()) {
         $course_id = get_the_ID();
+    } else {
+        echo 'No luck with the course id .';
     }
 
-    // Check if we're on a lesson page
-    if (function_exists('STM_LMS_Lesson') && is_singular('stm-lessons')) {
-        $lesson_id = get_the_ID();
-        $course_id = get_post_meta($lesson_id, 'course_id', true);
+   
+    $lesson_id = get_the_ID();
+    // $course_id = stm_lms_get_course_id($lesson_id);
+    // $course_id = get_post_meta($lesson_id, 'course_id', true);
+    // global $post;
+    // echo '<pre>';
+    // print_r($post);
+    // echo '</pre>';
+
+    
+    if ($course_id) {
+        echo 'Course ID: ' . $course_id;
+    } else {
+        echo 'No course ID found for this lesson.';
+    }
+    // $all_meta = get_post_meta($lesson_id);
+    // // Print all meta keys and values for debugging
+    // echo '<pre>';
+    // print_r($all_meta);
+    // echo '</pre>';
+    
+    // Check if 'course_id' exists in the meta
+    // if ( isset($all_meta['course_id']) ) {
+    //     $course_id = $all_meta['course_id'][0]; // Assuming it's a single value
+    // } else {
+    //     echo 'No course_id found in post meta.';
+    //     echo $lesson_id;
+    // }
+   
+    $connected_courses = get_courses_for_item($lesson_id);
+
+    if (!empty($connected_courses)) {
+        foreach ($connected_courses as $course_id) {
+            echo "Connected to course ID: " . $course_id . "<br>";
+        }
+    } else {
+        echo "This item is not connected to any courses.";
     }
 
-    wp_localize_script('mstimer-js', 'mstimer_vars', array(
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'user_id' => get_current_user_id(),
-        'course_id' => $course_id,
-        'lesson_id' => $lesson_id,
-    ));
+    $current_url = get_current_url();
+
+    // Remove the lesson ID from the URL
+    $clean_url = remove_lesson_id_from_url($current_url, $lesson_id);
+
+    // Get the post ID from the cleaned URL
+    $course_id = url_to_postid($clean_url);
+
+    
+
+
+    // If no course ID is found, print the whole post meta
+    // if (empty($course_id)) {
+    //     $post_meta = get_post_meta($lesson_id);
+    //     var_dump($post_meta);
+    // } else {
+    //     $post_meta = get_post_meta($lesson_id);
+    //     var_dump($post_meta);
+    // }
+    
+    if (!is_page() && !is_single()) {
+        wp_localize_script('mstimer-js', 'mstimer_vars', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'user_id' => get_current_user_id(),
+            'course_id' => $course_id,
+            'lesson_id' => $lesson_id,
+        ));
+    } else {
+        echo 'This is a page or a post. Custom function not executed.';
+    }
+
+    
 }
+
 add_action('wp_enqueue_scripts', 'mstimer_enqueue_scripts');
 
 
@@ -231,7 +322,7 @@ function mstimer_courses_page() {
         $course_title = get_the_title($data->course_id);
         $course_link = admin_url('admin.php?page=mstimer_course_detail&course_id=' . $data->course_id . '&start_date=' . $start_date . '&end_date=' . $end_date);
         echo '<tr>';
-        echo '<td><a href="' . esc_url($course_link) . '">' . esc_html($course_title) . '</a></td>';
+        echo '<td><a href="' . esc_url($course_link) . '">' . esc_html($course_title) . 'Link' .'</a></td>';
         echo '<td>' . esc_html(round($data->avg_time, 2)) . '</td>';
         echo '</tr>';
     }
