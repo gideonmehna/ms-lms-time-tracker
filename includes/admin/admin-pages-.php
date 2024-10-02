@@ -35,12 +35,8 @@ add_action('admin_notices', 'remove_admin_notices_for_plugin_page', 1);
  * Display admin page content
  */
 function mstimer_admin_page() {
-    
-
     echo '<h1>Time Tracking</h1>';
     echo '<p>Welcome to the Time Tracking plugin for Masterstudy LMS.</p>';
-
-    mstimer_courses_page();
 }
 
 function mstimer_add_back_buttons() {
@@ -81,14 +77,14 @@ function mstimer_courses_page() {
 
 
     echo '<table class="wp-list-table widefat fixed striped">';
-    echo '<thead><tr><th>Course</th><th>Average Time (hh:mm:ss)</th></tr></thead><tbody>';
+    echo '<thead><tr><th>Course</th><th>Average Time (seconds)</th></tr></thead><tbody>';
 
     foreach ($courses_data as $data) {
         $course_title = get_the_title($data->course_id);
         $course_link = admin_url('admin.php?page=mstimer_course_detail&course_id=' . $data->course_id . '&start_date=' . $start_date . '&end_date=' . $end_date);
         echo '<tr>';
         echo '<td><a href="' . esc_url($course_link) . '">' . esc_html($course_title) . 'Link' .'</a></td>';
-        echo '<td>' . esc_html(format_time_human_readable(round($data->avg_time, 2))) . '</td>';
+        echo '<td>' . esc_html(round($data->avg_time, 2)) . '</td>';
         echo '</tr>';
     }
     echo '</tbody></table>';
@@ -168,14 +164,14 @@ function mstimer_lesson_view($course_id, $start_date, $end_date) {
 
     echo '<h2>Lesson View</h2>';
     echo '<table class="wp-list-table widefat fixed striped">';
-    echo '<thead><tr><th>Lesson</th><th>Average Time (hh:mm:ss)</th></tr></thead><tbody>';
+    echo '<thead><tr><th>Lesson</th><th>Average Time (seconds)</th></tr></thead><tbody>';
 
     foreach ($lessons_data as $data) {
         $lesson_title = get_the_title($data->lesson_id);
         $lesson_link = admin_url('admin.php?page=mstimer_lesson_detail&lesson_id=' . $data->lesson_id . '&course_id=' . $course_id . '&start_date=' . $start_date . '&end_date=' . $end_date);
         echo '<tr>';
         echo '<td><a href="' . esc_url($lesson_link) . '">' . esc_html($lesson_title) . '</a></td>';
-        echo '<td>' . esc_html(format_time_human_readable(round($data->avg_time, 2))) . '</td>';
+        echo '<td>' . esc_html(round($data->avg_time, 2)) . '</td>';
         echo '</tr>';
     }
     echo '</tbody></table>';
@@ -199,22 +195,20 @@ function mstimer_lesson_student_times($lesson_id, $start_date, $end_date) {
 
     echo '<h2>Student Times for Lesson</h2>';
     echo '<table class="wp-list-table widefat fixed striped">';
-    echo '<thead><tr><th>Student</th><th>Total Time (hh:mm:ss)</th></tr></thead><tbody>';
+    echo '<thead><tr><th>Student</th><th>Total Time (seconds)</th></tr></thead><tbody>';
 
     foreach ($students_data as $data) {
         $user_info = get_userdata($data->user_id);
         $student_name = $user_info ? $user_info->display_name : 'Unknown User';
         echo '<tr>';
         echo '<td>' . esc_html($student_name) . '</td>';
-        echo '<td>' . esc_html(format_time_human_readable(round($data->total_time, 2))) . '</td>';
+        echo '<td>' . esc_html(round($data->total_time, 2)) . '</td>';
         echo '</tr>';
     }
     echo '</tbody></table>';
 }
 
 function mstimer_lesson_detail_page() {
-    mstimer_add_back_buttons();
-
     $lesson_id = isset($_GET['lesson_id']) ? intval($_GET['lesson_id']) : 0;
     $course_id = isset($_GET['course_id']) ? intval($_GET['course_id']) : 0;
     $start_date = isset($_GET['start_date']) ? sanitize_text_field($_GET['start_date']) : date('Y-m-d', strtotime('-30 days'));
@@ -276,7 +270,7 @@ function mstimer_student_view($course_id, $start_date, $end_date) {
 
     echo '<h2>Student View</h2>';
     echo '<table class="wp-list-table widefat fixed striped">';
-    echo '<thead><tr><th>Student</th><th>Total Time (hh:mm:ss)</th></tr></thead><tbody>';
+    echo '<thead><tr><th>Student</th><th>Total Time (seconds)</th></tr></thead><tbody>';
 
     foreach ($students_data as $data) {
         $user_info = get_userdata($data->user_id);
@@ -284,7 +278,7 @@ function mstimer_student_view($course_id, $start_date, $end_date) {
         $student_link = admin_url('admin.php?page=mstimer_student_detail&user_id=' . $data->user_id . '&course_id=' . $course_id . '&start_date=' . $start_date . '&end_date=' . $end_date);
         echo '<tr>';
         echo '<td><a href="' . esc_url($student_link) . '">' . esc_html($student_name) . '</a></td>';
-        echo '<td>' . esc_html(format_time_human_readable(round($data->total_time, 2))) . '</td>';
+        echo '<td>' . esc_html(round($data->total_time, 2)) . '</td>';
         echo '</tr>';
     }
     echo '</tbody></table>';
@@ -309,21 +303,19 @@ function mstimer_student_lesson_times($user_id, $course_id, $start_date, $end_da
 
     echo '<h2>Lessons Times for Student</h2>';
     echo '<table class="wp-list-table widefat fixed striped">';
-    echo '<thead><tr><th>Lesson</th><th>Total Time (hh:mm:ss)</th></tr></thead><tbody>';
+    echo '<thead><tr><th>Lesson</th><th>Total Time (seconds)</th></tr></thead><tbody>';
 
     foreach ($lessons_data as $data) {
         $lesson_title = get_the_title($data->lesson_id);
         echo '<tr>';
         echo '<td>' . esc_html($lesson_title) . '</td>';
-        echo '<td>' . esc_html(format_time_human_readable(round($data->total_time, 2))) . '</td>';
+        echo '<td>' . esc_html(round($data->total_time, 2)) . '</td>';
         echo '</tr>';
     }
     echo '</tbody></table>';
 }
 
 function mstimer_student_detail_page() {
-    mstimer_add_back_buttons();
-
     $user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
     $course_id = isset($_GET['course_id']) ? intval($_GET['course_id']) : 0;
     $start_date = isset($_GET['start_date']) ? sanitize_text_field($_GET['start_date']) : date('Y-m-d', strtotime('-30 days'));
@@ -376,7 +368,7 @@ function mstimer_students_page() {
 
     echo '<h1>Students</h1>';
     echo '<table>';
-    echo '<tr><th>Student</th><th>Course</th><th>Total Time (hh:mm:ss)</th></tr>';
+    echo '<tr><th>Student</th><th>Course</th><th>Total Time (seconds)</th></tr>';
 
     foreach ($students_data as $data) {
         $user = get_userdata($data->user_id);
@@ -384,7 +376,7 @@ function mstimer_students_page() {
         echo '<tr>';
         echo '<td><a href="?page=mstimer_students&user_id=' . $data->user_id . '">' . esc_html($user->display_name) . '</a></td>';
         echo '<td>' . esc_html($course_title) . '</td>';
-        echo '<td>' . esc_html(format_time_human_readable($data->total_time)) . '</td>';
+        echo '<td>' . esc_html($data->total_time) . '</td>';
         echo '</tr>';
     }
 
@@ -396,13 +388,13 @@ function mstimer_students_page() {
 
         echo '<h2>Lessons</h2>';
         echo '<table>';
-        echo '<tr><th>Lesson</th><th>Total Time (hh:mm:ss)</th></tr>';
+        echo '<tr><th>Lesson</th><th>Total Time (seconds)</th></tr>';
 
         foreach ($lessons_data as $data) {
             $lesson_title = get_the_title($data->lesson_id);
             echo '<tr>';
             echo '<td>' . esc_html($lesson_title) . '</td>';
-            echo '<td>' . esc_html(format_time_human_readable($data->total_time)) . '</td>';
+            echo '<td>' . esc_html($data->total_time) . '</td>';
             echo '</tr>';
         }
 

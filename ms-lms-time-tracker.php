@@ -23,13 +23,13 @@ define('MSTIMER_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MSTIMER_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 // Include necessary files
+require_once MSTIMER_PLUGIN_DIR . 'includes/helpers/time-formatting.php';
 require_once MSTIMER_PLUGIN_DIR . 'includes/admin/admin-menu.php';
 require_once MSTIMER_PLUGIN_DIR . 'includes/admin/admin-pages.php';
 require_once MSTIMER_PLUGIN_DIR . 'includes/admin/data-export.php';
 require_once MSTIMER_PLUGIN_DIR . 'includes/database/database-functions.php';
 require_once MSTIMER_PLUGIN_DIR . 'includes/frontend/enqueue-scripts.php';
 require_once MSTIMER_PLUGIN_DIR . 'includes/frontend/ajax-handlers.php';
-require_once MSTIMER_PLUGIN_DIR . 'includes/helpers/time-formatting.php';
 require_once MSTIMER_PLUGIN_DIR . 'includes/helpers/url-helpers.php';
 
 // Activation hook
